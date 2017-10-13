@@ -1,12 +1,33 @@
 //Aluno: Ignácio Espinoso Ribeiro
 //RA: 169767
 
-#include<cstdio>
-#include<cstdlib>
-#include<iostream>
+/*Funcionamento do programa: O programa faz uso de um vetor de especies para
+manter um registro fixo das árvores de cada espécie. A partir disso, são criados
+dois heaps: Um de ponteiros para espécie, ordenado pelo elemento correspondente
+ao 60% da espécie. Outro heap é temporário, contendo cópias das espécies (mas
+ainda apontando pras árvores originais), ordenado pela árvore mais velha de cada
+espécie.
+  A passagem dos elementos do vetor de espécies original para os heaps se dá em
+mlog(k), dado que uma árvore é inserida de cada vez num heap de espécies.
+  Do heap de árvores mais velhas, geramos um vetor contendo todas as árvores do
+problema, ordenado decrescentemente começando pela árvore mais velha. Essa
+passagem ocorre em mlog(k).
+  Posteriormente, ocorrem os cortes das espécies velhas propriamente ditas. A obten
+ção da árvore mais velha de todas ocorre em O(1) pois temos o primeiro elemento
+válido do vetor all_trees. O loop permanece rodando enquanto tiverem ocorrido
+cortes na iteração passada e estivermos acessando uma posição válida.
+  A primeira etapa do corte é a detecção das espécies velhas e, então a marcação
+das árvores a serem excluidas do vetor de espécies original. Como o corte itera
+sobre o heap de 60%, temos um tempo proporcional a .
+  Por fim, depois da marcação realizamos efetivamente a remoção das árvores,
+atualização do heap de árvores e da posição da árvore mais velha ainda não cortada.*/
+
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
 #include <vector>
 #include <new>
-#include<algorithm>
+#include <algorithm>
 #include <cmath>
 
 using namespace std;
@@ -25,10 +46,9 @@ class tree_specie {
 void mark_trees(vector<tree_specie*> &heap_60_species, int index, vector<int> &to_be_cut, int age_oldest_tree);
 void heapify_60(vector<tree_specie*> &heap_60_species, int index);
 void remove_element_heap (vector<tree_specie*> &heap_60_species, int index);
-bool compare_oldest_species(tree_specie specie1, tree_specie specie2);
+bool compare_oldest_species(tree_specie *specie1, tree_specie *specie2);
 bool compare_60_species(tree_specie *specie1, tree_specie *specie2);
-bool its_young_specie(tree_specie* specie, int age_oldest_tree);
-bool has_cut(vector<tree_specie*> to_be_cut);
+bool its_young_specie(tree_specie *specie, int age_oldest_tree);
 
 int main() {
   int species_amount, specie_total_trees;
@@ -48,9 +68,9 @@ int main() {
 
   //Ordena os heaps auxiliares, um ordenado pelo 60% da especie, outro pelo max.
   vector<tree_specie*> heap_60_species;
-  vector<tree_specie> oldest_species;
+  vector<tree_specie*> oldest_species;
   for(int i = 0; i < species_amount; i++) {
-    oldest_species.push_back(species[i]);
+    oldest_species.push_back(new tree_specie(species[i]));
     push_heap(oldest_species.begin(), oldest_species.end(), compare_oldest_species);
     heap_60_species.push_back(&species[i]);
     push_heap(heap_60_species.begin(), heap_60_species.end(), compare_60_species);
@@ -60,17 +80,18 @@ int main() {
   //as árvores ordenado pela idade.
   std::vector<tree*> all_trees;
   while(!oldest_species.empty()) {
-    all_trees.push_back(oldest_species[0].trees.back());
-    oldest_species[0].trees.pop_back();
+    all_trees.push_back(oldest_species[0]->trees.back());
     pop_heap(oldest_species.begin(), oldest_species.end(), compare_oldest_species);
-    if(oldest_species[oldest_species.size() - 1].trees.empty()) {
+    oldest_species[oldest_species.size() - 1]->trees.pop_back();
+    if(oldest_species[oldest_species.size() - 1]->trees.empty()) {
+      delete oldest_species.back();
       oldest_species.pop_back();
     } else {
       push_heap(oldest_species.begin(), oldest_species.end(), compare_oldest_species);
     }
   }
 
-  //Realiza os cortes necessários.      all_trees, heap_60_species
+  //Realiza os cortes necessários.
   bool cut_happened = true;
   int age_oldest_tree = all_trees[0]->age;
   int oldest_tree_index = 0, cut_counter = 0;
@@ -80,7 +101,6 @@ int main() {
     //especies que terão árvores cortadas em to_be_cut.
     age_oldest_tree = all_trees[oldest_tree_index]->age;
     mark_trees(heap_60_species, 0, to_be_cut, age_oldest_tree);
-
 
     //Atualiza contador de cortes.
     cut_counter += (int) to_be_cut.size();
@@ -104,37 +124,12 @@ int main() {
     }
   }
 
-
-// cout << "==============================================================================teste\n";
-//   cout << "TREES\n";
-//   for(int i = 0; i < all_trees.size(); i++) {
-//     cout << all_trees[i]->age << " ";
-//   }
-//   cout << "\n\nSPECIES\n";
-//   for(int i = 0; i < species.size(); i++) {
-//     for(int j = 0; j < species[i].trees.size(); j++) {
-//       cout << species[i].trees[j]->age << " ";
-//     }
-//     cout << '\n';
-//   }
-//
-//   cout << "\nSIXTY\n";
-//   for(int i = 0; i < heap_60_species.size(); i++) {
-//     for(int j = 0; j < heap_60_species[i]->trees.size(); j++) {
-//       cout << heap_60_species[i]->trees[j]->age << " ";
-//     }
-//     cout << '\n';
-//   }
-//   cout << "\ncut_counter: " << cut_counter << '\n';
-// cout << "\n==============================================================================\n";
-
-  //Desaloca memória.
-  // for(int i = 0; i < species_amount; i++) {
-  //   species[i].trees.erase(species[i].trees.begin(), species[i].trees.end());
-  //   oldest_species[i].trees.erase(oldest_species[i].trees.begin(), oldest_species[i].trees.end());
-  // }
-  // species.erase(species.begin(), species.end());
   cout << cut_counter << '\n';
+
+  //Desaloca memoria alocada para as árvores.
+  for(int i = 0; i < (int) all_trees.size(); i++) {
+    delete all_trees[i];
+  }
   return 0;
 }
 
@@ -189,8 +184,8 @@ void remove_element_heap (vector<tree_specie*> &heap_60_species, int index) {
   heapify_60(heap_60_species, index);
 }
 
-bool compare_oldest_species(tree_specie specie1, tree_specie specie2) {
-  return ((specie1).trees[(specie1).trees.size()-1]->age) < ((specie2).trees[(specie2).trees.size()-1]->age);
+bool compare_oldest_species(tree_specie *specie1, tree_specie *specie2) {
+  return ((*specie1).trees[(*specie1).trees.size()-1]->age) < ((*specie2).trees[(*specie2).trees.size()-1]->age);
 }
 
 bool compare_60_species(tree_specie *specie1, tree_specie *specie2) {
@@ -199,13 +194,6 @@ bool compare_60_species(tree_specie *specie1, tree_specie *specie2) {
 
 bool its_young_specie(tree_specie* specie, int age_oldest_tree) {
   if(specie->trees[(int) ceil(0.6 * specie->trees.size()) - 1]->age <= (0.6 * age_oldest_tree)) {
-    return true;
-  }
-  return false;
-}
-
-bool has_cut(vector<tree_specie*> to_be_cut) {
-  if (to_be_cut.size() > 0) {
     return true;
   }
   return false;
